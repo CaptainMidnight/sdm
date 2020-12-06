@@ -3,7 +3,11 @@
 # This file is sourced by some sdm-related scripts
 #
 function readparams() {
+    #
+    # Restores the global variables from /etc/sdm/cparams
+    #
     # $1="/mnt/sdm" if in phase 0, "" if in phase 1
+    #
     local i="$1"
     [[ "$1" =~ "/mnt/sdm" ]]  && i="/mnt/sdm" || i=""
     if [ -f $i/etc/sdm/cparams ]
@@ -33,11 +37,12 @@ function logit {
     #
     # $1="/mnt/sdm" if in phase 0, "" if in phase 1
     # $2="message string"
-#    [ ! -f "$1/etc/sdm/history" ] && touch $1/etc/sdm/history
     echo "$(thisdate) $2" >> $1/etc/sdm/history
 }
 
 function logtoboth {
+    #
+    # Writes the message to the terminal and also to /etc/sdm/history
     #
     # $1="/mnt/sdm" if in phase 0, "" if in phase 1
     # $2="message string" which will be split up
@@ -56,6 +61,12 @@ function logtoboth {
 	    spc="  "
 	done
     fi	
+}
+
+function bootlog() {
+    # Write string in $1 to the system log/journal and /etc/sdm/history.log
+    logger "FirstBoot: $1"
+    logit "" "> FirstBoot $1"
 }
 
 function getpwd() {
@@ -94,7 +105,6 @@ function sdmuseradd() {
     usermod --gid users $user
     usermod --groups $GROUPS $user
     changepwd $user "$password"
-    echo "Done"
 }
 
 function askyn() {
@@ -145,29 +155,6 @@ function thisdate() {
     echo  "$(date +"$datefmt")"
 }
 
-function dosdmreboot() {
-    #
-    # called from sdm-firstboot-reboot service on the running system during First Boot
-    # reboot the system after system startup has completed
-    #
-    source /usr/local/sdm/sdm-cparse ; readparams ""
-    #
-    # Make sure that system startup has completed. Wait for either graphical.target OR multi-user.target
-    #
-    #  had an issue with this, keeping for investigation:  while [ "$(systemctl show -p ActiveState $(systemctl get-default) --value)" != "active" ]
-    while [ "$(systemctl show -p ActiveState graphical.target --value)" != "active" -a "$(systemctl show -p ActiveState multi-user.target --value)" != "active" ]
-    do
-	sleep 1
-    done
-    echo -e "\n$(thisdate) FirstBoot: Restarting the system in 10 seconds\n" > /dev/console
-    logit "" "> FirstBoot: Restarting the system in 10 seconds"
-    sleep 10
-    systemctl daemon-reload
-    logit "" "> FirstBoot: Restarting the system"
-    rm -f /etc/systemd/system/sdm-firstboot-reboot.service    #Don't leave a mess
-    systemctl reboot
-}
-    
 function ord() {
     #
     # Returns the value in decimal of the character in $1
@@ -224,4 +211,60 @@ function resetcolors() {
     local tfg tbg tcursor
     eval "tfg=\$${1}fg ; tbg=\$${1}bg ; tcursor=\$${1}cursor"
     stermcolors "$tfg" "$tbg" "$tcursor"
+}
+
+function flashled0() {
+    echo 1 | tee /sys/class/leds/led0/brightness > /dev/null 2>&1
+    sleep $1
+    echo 0 | tee /sys/class/leds/led0/brightness > /dev/null 2>&1
+    sleep .2
+}
+
+function morseled() {
+    local msg="$1"
+    local dit=".2" dot=".6" inter=".5"
+    for (( i=0 ; i<${#msg} ; i++))
+    do
+	case "${msg:$i:1}" in
+	    .) flashled0 $dit ;;
+	    -) flashled0 $dot ;;
+	    " ") sleep $inter ;;
+	esac
+	
+    done
+}
+
+function iponline() {
+    #
+    # Test if IP address $1 is online
+    # Returns 0 if online, 1 if offline
+    #
+    local pcnt=1 pingwait=1
+    if (ping -c $pcnt -W $pingwait $1 > /dev/null 2>&1 )
+    then
+	return 0
+    else
+	return 1
+    fi
+}
+
+function ckkeymap() {
+    [ "$1" == "" ] && return 0
+    (grep "^  ${1} " /usr/share/doc/keyboard-configuration/xorg.lst > /dev/null 2>&1) && return 0 || return 1
+}
+
+function cklocale() {
+    [ "$1" == "" ] && return 0
+    (grep "^${1}" /usr/share/i18n/SUPPORTED > /dev/null 2>&1) && return 0 || return 1
+    return 0
+}
+
+function ckwificountry() {
+    [ "$1" == "" ] && return 0
+    (grep "^${1}" /usr/share/zoneinfo/iso3166.tab > /dev/null 2>&1) && return 0 || return 1
+}
+
+function cktimezone() {
+    [ "$1" == "" ] && return 0
+    [ -e /usr/share/zoneinfo/$1 ] && return 0 || return 1
 }

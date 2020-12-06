@@ -25,17 +25,19 @@ While better than not having ANY notes, this approach requires relatively comple
 
 ***As a bonus***, sdm includes an *optional* script to install and configure `apt-cacher-ng`. `apt-cacher-ng` is a RasPiOS package that lets you update all your Pis quickly by caching downloaded packages locally on your LAN. This can greatly reduce install and update time, as well as internet network consumption.
 
-sdm is for RasPiOS, and runs on RasPiOS Buster. sdm requires a USB SD Card reader to write a new SD Card, or a USB adapter to write a new SSD. You cannot use sdm to rewrite the running system's SD Card or system disk.
+sdm is for RasPiOS, and runs on RasPiOS Buster. It can also run on other Linux systems. See the 'Compatibility' section below. sdm requires a USB SD Card reader to write a new SD Card, or a USB adapter to write a new SSD. You cannot use sdm to rewrite the running system's SD Card or system disk.
 
 ## Usage overview
 
 ### sdm Quick Start
 
-Here's how to quickly and easily to create and customize an IMG file and burn it to an SD Card. It's assumed that there is a freshly downloaded copy of RasPiOS 2020-08-20-raspios-buster-armhf-full.img or 2020-08-20-raspios-buster-armhf-lite.img in the current directory, and that there is an SD Card in /dev/sde.
+Here's how to quickly and easily to create and customize an IMG file and burn it to an SD Card. It's assumed that there is an SD Card in /dev/sde.
 
 Throughout this document read "SD Card" as "SSD or SD Card". They are treated equivalently by sdm.
 
 * **Install sdm and systemd-container:** `sudo curl -L https://raw.githubusercontent.com/gitbls/sdm/master/EZsdmInstaller | bash`
+
+* **If needed, download the desired RasPiOS zipped IMG** from the raspberrypi.org website and unzip it. Direct link to the downloads: [Raspberry Pi Downloads](https://downloads.raspberrypi.org/). Pick the latest image in the folder **raspios_full_armhf** (32-bit), **raspios_lite_armhf** (32-bit), **raspios_arm64** (64-bit Beta), or **raspios_lite_arm64** (64-bit Beta), as appropriate.
 
 * **Customize the image:** `sudo /usr/local/sdm/sdm 2020-08-20-raspios-buster-armhf-full.img --wpa /path/to/working/wpa_supplicant.conf --noextend --L10n --restart`
 
@@ -71,7 +73,7 @@ What else can sdm do? Here are a few examples:
 
 * **Enable Pi-specific devices** &mdash; Easily enable camera, i2c, etc, via raspi-config automation
 
-* **Other customizations** &mdash; Done through a simple batch script. The file sdm-customphase is a skeleton Custom Phase Script that you can copy, modify, and use. **Full disclosure:** You'll need to use a Custom Phase Script to copy your .bashrc or /etc/fstab, or perform systemd service management, etc.
+* **Other customizations** &mdash; Done through a simple batch script. The file sdm-customphase is a skeleton Custom Phase Script that you can copy, modify, and use. **Full disclosure:** You'll need to use a Custom Phase Script to copy your .bashrc or perform systemd service management, etc.
 
     See the section Custom Phase Script below for details, and see the section below on /etc/fstab as well.
 
@@ -106,6 +108,8 @@ Installation is simple. sdm must be installed in and uses the path `/usr/local/s
     sudo curl -L https://raw.githubusercontent.com/gitbls/sdm/master/sdm-firstboot -o /usr/local/sdm/sdm-firstboot
     sudo curl -L https://raw.githubusercontent.com/gitbls/sdm/master/sdm-apt-cacher -o /usr/local/sdm/sdm-apt-cacher
     sudo curl -L https://raw.githubusercontent.com/gitbls/sdm/master/sdm-customphase -o /usr/local/sdm/sdm-customphase
+    sudo curl -L https://raw.githubusercontent.com/gitbls/sdm/master/sdm-logmsg -o /usr/local/sdm/sdm-logmsg
+    sudo curl -L https://raw.githubusercontent.com/gitbls/sdm/master/sdm-cportal -o /usr/local/sdm/sdm-cportal
     sudo curl -L https://raw.githubusercontent.com/gitbls/sdm/master/sdm-1piboot/1piboot.conf -o /usr/local/sdm/1piboot/1piboot.conf
     sudo curl -L https://raw.githubusercontent.com/gitbls/sdm/master/sdm-1piboot/010-disable-triggerhappy.sh -o /usr/local/sdm/1piboot/010-disable-triggerhappy.sh
     sudo curl -L https://raw.githubusercontent.com/gitbls/sdm/master/sdm-1piboot/030-disable-rsyslog.sh -o /usr/local/sdm/1piboot/030-disable-rsyslog.sh
@@ -187,6 +191,10 @@ sdm consists of a primary script `sdm` and several supporting scripts:
 
 * **sdm-cparse**  &mdash; Helper script that defines some sdm-internal bash functions.
 
+* **sdm-cportal** &mdash; Implements the Captive Portal for `--loadlocal wifi`
+
+* **sdm-logmsg** &mdash; Helper script for the Captive Portal.
+
 * **sdm-customphase**  &mdash; Custom Phase Script skeleton. Use this as a starting point to build your own Custom Phase Script. See Custom Phase Script below.
 
 * **sdm-apt-cacher**  &mdash; Configures and installs apt-cacher-ng. This is optional, but highly recommended, especially with slower internet connections. sdm will use this with the `--aptcache` command switch. See the section on apt-cacher-ng below for details.
@@ -226,14 +234,14 @@ One last First Boot setting controls whether the system automatically restarts a
 
 First Boot Automatic System Restart is useful for a couple reasons:
 
-* if access to the system requires a configuration setting modified during the First Boot. A reboot ensures that all configuration settings are fully enabled.
+* if access to the system requires a configuration setting modified during the First Boot. A restart ensures that all configuration settings are fully enabled.
 
-    For example, if the only access to the Pi will be over the serial port, the system must be restarted before the serial port will be active. In this case you would enable `serial=0` in 1piboot.conf and use the `--restart` command switch so the Pi automatically restarts.
+    For example, if the only access to the Pi will be over the serial port, the system must be restarted before the serial port will be active. In this situation the `--bootset serial:0 --restart` command switches enable the serial port and automatically restart the Pi. After the restart, the serial port is active.
 
 * You want it to reboot to make it easier to ensure that your configuration and services are as desired
 * You want the system to be fully operational so you can get started!
 
-**NOTE:** If `--restart` is specified on **RasPiOS Full with Desktop** sdm changes the boot_behaviour to **B1** (Text console with no autologin) so that the sdm FirstBoot messages are visible. In this case the boot_behaviour is reset to **B4** (Graphical Desktop with autologin) for all subsequent reboots, unless 1piboot.conf has been modified and a different value for boot_behaviour is set.
+**NOTE:** If `--restart` is specified on **RasPiOS Full with Desktop** sdm changes the boot_behaviour to **B1** (Text console with no autologin) so that the sdm FirstBoot messages are visible. In this case the boot_behaviour is reset to **B4** (Graphical Desktop with autologin) for all subsequent reboots, unless the command line included `--bootset boot_behaviour:xx` command switch was specified.
 
 #### Boot Order
 
@@ -279,12 +287,17 @@ At that point, you can remove the SD card and move ahead with setting up your SS
 
     Mounts the IMG file (first example) or SD Card (second example) onto the running system. This enables you to manually and easily copy files from the running RasPiOS system into the IMG.
 
- **NOTE: BE VERY CAREFUL!** When you use the `--mount` command you're running as root with access to everything! If you copy or delete a file and neglect to prefix the file directory reference with **/mnt/sdm** you will modify your running system.
+    **NOTE: BE VERY CAREFUL!** When you use the `--mount` command you're running as root with access to everything! If you copy or delete a file and neglect to prefix the file directory reference with **/mnt/sdm** you will modify your running system.
+
+* `sudo /usr/local/sdm/sdm --info` *what* &mdash; Display one of the databases that specify timezones, locale, keymaps, and wifi-country. The *what* argument can be one of `time`, `locale`, `keymap`, or `wifi`. The requested database is displayed with the `less` command. `--info help` will display the list of options.
+
 
 sdm has a broad set of command switches. These can be specified in any case (UPPER, lower, or MiXeD).
 
-* `--1piboot` *conffile* &mdash; Specify a 1piboot.conf file to use instead of the one in /usr/local/sdm/1piboot/1piboot.conf
+* `--1piboot` *conffile* &mdash; Specify a 1piboot.conf file to use instead of the one in /usr/local/sdm/1piboot/1piboot.conf. Note that this is less preferable than using the `--bootset` command switch.
 * `--apps` *applist* &mdash; Specifies a list of apps to install. This can be either a quoted list of space-separate apps ("zip iperf3 nmap") or a pointer to a file (@file), which has one package name per line. Comments are preceded by a pound sign ('#') and are ignored. You must specify `--poptions apps` in order for sdm to process the *apps* list.
+* `--apssid` *SSID* &mdash; Use the specified SSID for the Captive Portal instead of the default 'sdm'. See the Captive Portal section below for details.
+* `--apip` *IPaddr* &mdash; use the specified IP Address instead of the default 10.1.1.1. See the Captive Portal section below for details.
 * `--aptcache` *IPaddr* &mdash; Use APT caching. The argument is the IP address of the apt-cacher-ng server
 * `--aptconfirm` &mdash; Prompt for confirmation before APT installs and updates are done in sdm Phase 1
 * `--batch` &mdash; Do not provide an interactive command prompt inside the nspawn container
@@ -297,14 +310,31 @@ sdm has a broad set of command switches. These can be specified in any case (UPP
 * `--custom[1-4]` &mdash; 4 variables (custom1, custom2, custom3, and custom4) that can be used to further customize your Custom Phase Script.
 * `--datefmt "fmt"` &mdash; Use the specified date format instead of the default "%Y-%m-%d %H:%M:%S". See `man date` for format string details.
 * `--ddsw` *"switches"* &mdash; Provide switches for the `dd` command used with `--burn`. The default is "bs=16M oflag=direct". If `--ddsw` is specified, the default value is replaced.
+* `--dhcpcdwait` &mdash; Enable 'wait for network' (raspi-config System option S6).
+* `--dhcpcd` *file* &mdash; Append the contents of the specified file to /etc/dhcpcd.conf in the Customized Image.
 * `--eeprom` *value* &mdash; Change the eeprom value in /etc/default/rpi-eeprom-update. The RasPiOS default is 'critical', which is fine for most users. Change only if you know what you're doing.
+* `--exports` *file* &mdash; Copy the specified file into the image as /etc/exports
 * `--fstab` *file* &mdash; Append the contents of the specified file to /etc/fstab in the Customized Image. This is useful if you want the same /etc/fstab entries on your RasPiOS systems.
+* `--hdmi-force-hotplug` &mdash; Enable the hdmi_force_hotplug setting in /boot/config.txt
 * `--hdmigroup` *num* &mdash; hdmigroup setting in /boot/config.txt
 * `--hdmimode` *num* &mdash; hdmimode setting in /boot/config.txt
 * `--host` *hostname* or `--hostname` *hostname* &mdash; Specifies the name of the host to set onto the SD Card when burning it.
 * `--keymap` *keymapname* &mdash; Specifies the keymap to set into the image, or burn onto the SD Card. `--keymap` can be specified when customizing the image and/or when burning the SD card. Specifying `--keymap` with `--burn` overrides whatever is in the image. Also see `--l10n`. See the *layout* section in /usr/share/doc/keyboard-configuration/xorg.list for a complete list of keymaps.
 * `--l10n` &mdash; Build the image with the Keymap, Locale, Timezone, and WiFi Country of the system on which sdm is running. Note that the switch name is lowercase *L10N*, which is shorthand for "localization", just like I18N is shorthand for "internationalization"
-* `--locale` *localename* &mdash; The locale is specified just as you'd set it in raspi-config. For example, in the USA, one might use en_US.UTF-8, and in the UK en_UK.UTF-8. See /usr/share/local/i18n/SUPPORTED for a complete locale list.
+* `--loadlocal USB` &mdash; WiFi Credentials are read from a USB device. The switch keyword value USB is required. The Credentials must be in the file `local-settings.txt` in the root directory of the USB device. `local-settings.txt` has three text lines in it, specifying the WiFi Country, WiFi SSID and password in the format:
+
+        country=2 letter country code
+        ssid=yourSSIDname
+        password=yourWiFiPassword
+
+    `local-settings.txt` can include 3 additional lines for setting `keymap`, `locale`, and `timezone`. These take the same values as the `--keymap`, `--locale`, and `--timezone` command switches.
+
+    The First Boot process will wait for and use the first non-mounted USB device that is found. If the file `local-settings.txt` is not found on that USB device, First Boot will print a message on the console, and the wait process will be restarted, so the remote user can update their USB device as needed. See /usr/share/zoneinfo/iso3166.tab for the complete WiFi Country code list. If `--loadlocal` is used, `--wifi-country` and the WiFi Country setting obtained from `--l10n` are ignored.
+
+    In addition to the switch value USB, the `--loadlocal` switch also accepts the values `flashled` and `internet`. The `flashled` value causes the First Boot process to flash the green Pi LED with progress indicators. See the LED Flashing section below for details. The `internet` value causes First Boot to check that the Pi has Internet access. If there is no internet access, First Boot will restart the load from USB process.
+
+* `--loadlocal wifi` &mdash; Starts a WiFi Captive Portal to obtain and test the WiFi Credentials during the First Boot. See the Captive Portal section below for details. The *flashled* and *internet* options are not supported with `--loadlocal wifi`.
+* `--locale` *localename* &mdash; The locale is specified just as you'd set it in raspi-config. For example, in the USA, one might use en_US.UTF-8, and in the UK en_UK.UTF-8. See /usr/share/i18n/SUPPORTED for a complete locale list.
 * `--noextend` &mdash; Do not extend the IMG file at all
 * `--norestart` or `--noreboot` &mdash; Do not restart the system after the First Boot. This is useful if you set `--restart` when you build the image, but want to disable the automatic restart for a particular SD Card when you burn it.
 * `--nspawnsw` *"switches"* &mdash; Provide additional switches for the systemd-nspawn command. See `man systemd-nspawn`.
@@ -317,18 +347,20 @@ sdm has a broad set of command switches. These can be specified in any case (UPP
 
     Enter multiple values as a single string separated by commas. For example `--poptions apps,xapps` or `--poptions noupdate,noupgrade`
 
-* `--restart` or `--reboot` &mdash; Restart the system at the end of the First Boot. The `--restart` switch can be used on the command when customizing the IMG (will apply to all SD Cards) or on the `--burn` command (will apply only to SD cards burned with `--restart` set. The system will not restart until the boot process has fully completed.
+* `--reboot n` &mdash; Restart the system at the end of the First Boot after waiting an additional *n* seconds. The `-reboot` switch can be used on the command when customizing the IMG (will apply to all SD Cards) or on the `--burn` command (will apply only to SD cards burned with `--restart` set. The system will not restart until the boot process has fully completed. Waiting an additional time may be useful if your system has services that take longer to start up on the first boot. sdm waits until *n* seconds (n=20 for `--restart) after the graphical or multi-user target is reached.
+* `--restart` &mdash; Restart the system at the end of the First Boot. The `--restart` switch and `--reboot` are synonomous except that you cannot specify an additional restart wait with the `--restart` switch.
 * `--showapt` &mdash; Show the output from apt (Package Manager) on the terminal in Phase 1. By default, the output is not displayed on the terminal. All apt output is captured in /etc/sdm/apt.log in the IMG.
 * `--ssh` *SSHoption* &mdash; Control how SSH is enabled in the image. By default, if `--ssh` is not specified, SSH will be enabled in the image using the SSH service, just like RasPiOS. if `--ssh none` is specified SSH will not be enabled. If `--ssh socket` is specified SSH will be enabled using SSH sockets via systemd instead of having the SSH service hanging around all the time.
 * `--svcdisable` and `--svcenable` &mdash; Enable or disable named services, specified as comma-separate list, as part of the first system boot processing. 
+* `--sysctl` *file* &mdash; Copy the specified file into the image in /etc/sysctl.d. The filename must end with '.conf'
 * `--timezone` *tzname* &mdash; Set the timezone for the system.  See `sudo timedatectl list-timezones | less` for a complete list of timezones.
 * `--user` *username* &mdash; Specify a username to be created in the IMG. 
 * `--uid` *uid* &mdash; Use the specified uid rather than the next assignable uid for the new user, if created.
-* `--wifi-country` *countryname* &mdash; Specify the name of the country to use for the WiFi Country setting. See /usr/share/zoneinfo/iso3166.tab for a complete list. Also see `--l10n` which will extract the current WiFi Country setting from /etc/wpa_supplicant/wpa_supplicant.conf or /etc/wpa_supplicant/wpa_supplicant-wlan0.conf on the system on which sdm is running.
+* `--wifi-country` *countryname* &mdash; Specify the name of the country to use for the WiFi Country setting. See /usr/share/zoneinfo/iso3166.tab for the complete WiFi Country code list. Also see the `--l10n` command switch which will extract the current WiFi Country setting from /etc/wpa_supplicant/wpa_supplicant.conf or /etc/wpa_supplicant/wpa_supplicant-wlan0.conf on the system on which sdm is running.
 * `--wpa` *conffile* &mdash; Specify the wpa_supplicant.conf file to use. You can either specify your wpa_supplicant.conf on the command line, or copy it into your image in your sdm-customphase script. See the sample sdm-customphase for an example. `--wpa` can also be specified when burning the SD Card.
 * `--nowpa` &mdash; Use this to tell sdm that you really meant to not provide a wpa_supplicant.conf file. You must either specify `--wpa` or `--nowpa` when customizing an IMG. This is useful if you want to build SD Cards for different networks. You can use `--nowpa` when you customize the IMG, and then specify `--wpa` *conffile* when burning the SD Card.
 * `--xapps` *xapplist* &mdash; Like `--apps`, but specifies the list of apps to install when `--poptions xapps` is specified.
-* `--xmb` *n*` &mdash; Specify the number of MB to extend the image. The default is 2048 (MB), which is 2GB. You may need to increase this depending on the number of packages you choose to install in Phase 1. If the image isn't large enough, package installations will fail. If the image is too large, it will consume more disk space, and burning the image to an SD Card will take longer.
+* `--xmb` *n* &mdash; Specify the number of MB to extend the image. The default is 2048 (MB), which is 2GB. You may need to increase this depending on the number of packages you choose to install in Phase 1. If the image isn't large enough, package installations will fail. If the image is too large, it will consume more disk space, and burning the image to an SD Card will take longer.
 
 ## sdm-firstboot
 
@@ -341,6 +373,8 @@ A Custom Phase Script is a script provided by you. It is called 3 times: Once fo
 * In Phase 0, the host file system is fully available. The IMG file is mounted on /mnt/sdm, so all references to the IMG file system must be appropriately referenced by prefacing the directory string with /mnt/sdm. This enables the Custom Phase script to copy files from the host file system into the IMG file.
 
 * In Phase 1 and post-install (both inside nspawn) the host file system is not available at all. Thus, if a file is needed in Phase 1, Phase 0 must copy it into the IMG. References to /mnt/sdm will fail in Phase 1.
+
+If a Custom Phase Script wants to run a script at boot time, even if `--bootscripts` is not specified, the Custom Phase script should put the script in /etc/sdm/0piboot in the IMG and named 0*-*.sh (e.g., 010-customize-something.sh). These scripts are always run by FirstBoot.
 
 The best way to build a Custom Phase Script is to start with the example Custom Phase Script `sdm-customphase`, and extend it as desired.
 
@@ -355,6 +389,25 @@ One drawback with this approach is that your fstab additions will be processed d
 That's exactly what `--fstab` does. It copies the file you provide to /etc/sdm/assets in the IMG, and then processes that during the system FirstBoot.
 
 No matter which mechanism you use, you'll need to create the mount point directories in the image during Phase 1.
+
+## Captive Portal
+
+If `--loadlocal wifi` is specified on the command line during image customization, a Captive Portal is started during the system First Boot. The Captive Portal starts an Access Point named 'sdm' (can be changed with --apssid) and the IP Address 10.1.1.1 (can be changed with --apip). When you connect to http://10.1.1.1 a web page will be displayed that has two links on it.
+
+Clicking on the first link brings up a web form where the user can enter the SSID and Password for the WiFi network that the Pi should be connected to, as well as optionally specifying the Keymap, Locale, and Timezone appropriate for the user and location. There are two checkboxes, both checked, that the user can unselect: 
+
+* **Validate WiFi Configuration by Connecting** &mdash; If this is checked, the user-provided WiFi SSID and Password will be used to validate that the Pi can connect to WiFi. If it is not checked, the SSID and Password are written to wpa_supplicant.conf and no validation is done.
+* **Check Internet Connectivity after WiFi Connected** &mdash; If checked, the captive portal will also test whether the Internet (1.1.1.1) is accessible.
+
+The Captive Portal will complete and the boot process will continue if the WiFi connection test is successful, or if no WiFi validation is done. If there is a problem connecting to WiFi, the Portal will be re-enabled for another try.
+
+If the Pi has only a single WiFi on it (that is, no second WiFi via a USB adapter), the Captive Portal WiFi will be dropped when the WiFi validation is done. The user must reconnect to the Captive Portal WiFi before checking the result of the validation test.
+
+However, if the Pi has a second WiFi available (wlan1), the Captive Portal will use wlan1 for the Captive Portal, and use wlan0 for WiFi validation. In this case, the Captive Portal WiFi does not drop during this process.
+
+The Captive Portal (sdm-cportal) is built in such a way that it is usable outside of sdm. If you try to use it outside of sdm and run into problems, please open an issue on this github.
+
+NOTE: At the current time, the text displayed by the Captive Portal is only available in English. If you would like to contribute translations to other languages, open an issue on this github.
 
 ## Installing Samba into your IMG
 
@@ -380,7 +433,36 @@ Once you have configured the server system, copy sdm-apt-cacher to the server an
 
 Once you have the apt-cacher server configured you can use the `--aptcache` *IPaddr* sdm command switch to configure the IMG system to use the APT cacher.
 
-If you have other existing, running Pis that you want to convert to using your apt-cacher server, copy sdm-apt-cacher to each one and execute the command 'sudo /path/to/sdm-apt-cacher client`.
+If you have other existing, running Pis that you want to convert to using your apt-cacher server, copy sdm-apt-cacher to each one and execute the command `sudo /path/to/sdm-apt-cacher client`.
+
+## LED Flashing
+
+As noted above, `--loadlocal usb,flashled` will cause the First Boot process to flash the Green Pi LED with progress/problem indicators. This is very useful if the Pi doesn't have a monitor attached. The flash codes are ("." is a short flash, and "-" is a long flash):
+
+* `..- ..- ..-`  &mdash; First Boot is waiting for an unmounted USB device to appear with the file `local-settings.txt` on it.
+* `... --- ...`  &mdash; An error was found in `local-settings.txt`. Errors can include:
+    * ssid or password are not specified, or are the null string
+    * An invalid WiFi Country was specified
+    * An invalid Keymap, Locale, or Timezone was specified
+* `-- -- -- --`  &mdash; WiFi did not connect
+* `..... ..... .....`  &mdash; WiFi connected
+* `.-.-.- .-.-.- .-.-.- .-.-.-`  &mdash; Internet is accessible
+* `-.-.-. -.-.-. -.-.-. -.-.-.`  &mdash; Internet is not accessible
+* `..-. ..-. ..-.` &mdash; Waiting for a DHCP-assigned IP address
+
+## Compatibility &mdash; Non-Pi Linux and Pi 32-bit vs 64-bit
+
+sdm itself is mostly Linux distro-independent and 32-vs-64-bit agnostic. The interoperability issues arise when sdm uses the Linux `systemd-nspawn` command when customizing an image or using `--explore` on an image. Other sdm commands should work on any Linux host OS to access or modify a RasPiOS image.
+
+In order to do image customization or use `--explore` on an image on a non-RasPiOS host (e.g., x86 or x86_64), you must install `qemu-user-static`, which pulls in package `binfmt-support`:
+
+    sudo apt install qemu-user-static
+
+These components enable image customization and `--explore` on an RasPiOS image. If this doesn't work on your x86 Linux system, it may be too old and lacking updated support. I have tested this on Ubuntu 20.04, and it's able to operate on both RasPiOS 32 and 64-bit images.
+
+Running on 64-bit RasPiOS sdm can customize, explore, burn, and mount both 32-bit and 64-bit RasPiOS images.
+
+However, running on 32-bit RasPiOS sdm can only mount and burn 64-bit images; customization and `--explore` will not operate on 64-bit images when running on 32-bit RasPiOS. The systemd-nspawn command on 32-bit RasPiOS is not able to operate against a 64-bit RasPiOS image.
 
 ## Bread crumbs
 
@@ -413,3 +495,13 @@ A couple of quick notes on loop devices, which are used to mount the IMG file in
 * `losetup -d /dev/loopX` deletes the loop device /dev/loopX (e.g., /dev/loop0). You may need to do this to finish cleaning up from dangling mounts (which you do first, before deleting the loop device).
 
 * If your system doesn't have enough loop devices, you can increase the number by adding max_loop=n on end of /boot/cmdline.txt and reboot.
+
+## Known Restrictions and Issues
+
+* sdm uses the single mount point /mnt/sdm, so there can only be one copy of sdm active at once. 
+* sdm must be run as root.
+* sdm has only been tested on RasPiOS Buster 32-bit and 64-bit (beta) IMG files.
+
+## Credits
+
+sdm was inspired by posts by @HawaiianPi and @sakaki in the Raspberry Pi Forum: [STICKY: Making your own custom burn-n-boot Raspbian image](https://www.raspberrypi.org/forums/viewtopic.php?f=63&t=231762)

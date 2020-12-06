@@ -1,5 +1,67 @@
 # Changelog
 
+## V3.15
+
+* Complete logging of --exports, --sysctl, and --dhcpcd on burn command
+* Improve --burn messages consistency
+
+## V3.14
+
+* Add --exports file which copies the specified file into the image as /etc/exports
+* Add --sysctl file which copies the specified file into the image in /etc/sysctl.d The filename must end with '.conf'
+* Change --dhcpcd behavior to append to /etc/dhcpcd.conf in the image during Phase 0, so that it is in place for the first system boot.
+* Support --exports, --sysctl, and --dhcpcd on the burn command as well.
+
+## V3.13
+
+* Improve help if image has already been customized
+* Add --aptmaint update,upgrade,autoremove for "batch" mode IMG maintenance
+
+## V3.12
+
+* Improve DHCP wait logic in sdm-firstboot
+* Correct file naming local-1piboot(.conf) in sdm-firstboot
+* Add --hdmi-force-hotplug 1 to easily enable the setting in config.txt
+* Add --loadlocal wifi to get WiFi credentials via a Captive Portal WiFi hotspot. FlashLED doesn't work with this. Yet.
+* Add --dhcpcdwait to enable 'wait for internet'. Equivalent to raspi-config System Option S6.
+* Add --dhcpcd file to append the contents of 'file' to /etc/dhcpcd.conf
+
+## V3.11
+
+* --loadlocal accepts additional values 'flashled' signal status with the Green LED) and 'internet' (check for Internet connectivity)
+    
+## V3.10
+
+* Add --loadlocal to load WiFi and Localization details from a USB device on First Boot. Handy if sending an image or SD Card to
+someone who doesn't want to disclose their WiFi credentials.
+* Add --info command to 'less' the databases used for checking Time Zones, Locales, Keymaps, and WiFi Country. See `sdm --info help` for details
+* Check switch value errors for Locale, Keymap, Timezone, and WiFi Country
+
+## V3.9
+
+* Correct numeric test check
+
+## V3.8
+
+* Check that switches with numeric values are as they should be
+
+## V3.7
+
+* FirstBoot message cleanups
+* Always run firstboot scripts created in /etc/sdm/0piboot (e.g., from Custom Phase Scripts)
+
+## V3.6
+
+* Minor logging updates in sdm-firstboot
+* Remove gratuitous "Done" in sdm-cparse
+* --reboot now takes a value for number of seconds to wait after system has reached default target before restarting. --restart does NOT take a value, and has a wait time of 20 seconds.
+
+## V3.5
+
+Updates:
+
+* Redo FirstBoot handling for improved efficiency
+
 ## V3.4
 
 New features:
